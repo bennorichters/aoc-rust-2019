@@ -2,7 +2,6 @@
 // #![allow(unused_variables)]
 
 use std::{
-    cmp::min,
     fs::File,
     io::{prelude::*, BufReader},
     path::Path,
@@ -30,29 +29,30 @@ fn main() {
     let segs1 = segments(lines.first().unwrap());
     let segs2 = segments(lines.last().unwrap());
 
-    let r1 = min_dist(&segs1, &segs2);
-    let r2 = min_dist(&segs2, &segs1);
-    let result = min(r1, r2);
-    println!("{}", result);
+    let mut inters: Vec<Coord> = Vec::new();
+    inters = all_intersections(inters, &segs1, &segs2);
+    inters = all_intersections(inters, &segs2, &segs1);
+
+    println!("{}", min_dist(&inters));
 }
 
-fn min_dist(segs1: &[Line], segs2: &[Line]) -> i32 {
-    let mut result = 0;
+fn min_dist(inters: &[Coord]) -> i32 {
+    inters.iter().map(manhattan_distance).filter(|i| *i > 0).min().unwrap()
+}
+
+fn all_intersections(mut inters: Vec<Coord>, segs1: &[Line], segs2: &[Line]) -> Vec<Coord> {
     for h in segs1.iter().filter(|s| s.0 == LineType::Horizontal) {
         for v in segs2.iter().filter(|s| s.0 == LineType::Vertical) {
             if let Some(c) = intersection(h, v) {
-                let dist = manhattan_distance(c);
-                if dist > 0 {
-                    result = if result == 0 { dist } else { min(result, dist) };
-                }
+                inters.push(c);
             }
         }
     }
 
-    result
+    inters
 }
 
-fn manhattan_distance((x, y): Coord) -> i32 {
+fn manhattan_distance((x, y): &Coord) -> i32 {
     x.abs() + y.abs()
 }
 
