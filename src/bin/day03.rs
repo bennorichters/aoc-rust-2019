@@ -16,24 +16,30 @@ fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
         .collect()
 }
 
+#[derive(PartialEq)]
+enum LineType {
+    Horizontal,
+    Vertical,
+}
+
 type Coord = (i32, i32);
-type Line = (i32, i32, i32);
+type Line = (LineType, i32, i32, i32);
 
 fn main() {
     let lines = lines_from_file("in");
-    let (hs1, vs1) = segments(lines.first().unwrap());
-    let (hs2, vs2) = segments(lines.last().unwrap());
+    let segs1 = segments(lines.first().unwrap());
+    let segs2 = segments(lines.last().unwrap());
 
-    let r1 = min_dist(&hs1, &vs2);
-    let r2 = min_dist(&hs2, &vs1);
+    let r1 = min_dist(&segs1, &segs2);
+    let r2 = min_dist(&segs2, &segs1);
     let result = min(r1, r2);
     println!("{}", result);
 }
 
-fn min_dist(hs: &Vec<Line>, vs: &Vec<Line>) -> i32 {
+fn min_dist(segs1: &[Line], segs2: &[Line]) -> i32 {
     let mut result = 0;
-    for h in hs {
-        for v in vs {
+    for h in segs1.iter().filter(|s| s.0 == LineType::Horizontal) {
+        for v in segs2.iter().filter(|s| s.0 == LineType::Vertical) {
             if let Some(c) = intersection(h, v) {
                 let dist = manhattan_distance(c);
                 if dist > 0 {
@@ -50,10 +56,9 @@ fn manhattan_distance((x, y): Coord) -> i32 {
     x.abs() + y.abs()
 }
 
-fn segments(line: &str) -> (Vec<Line>, Vec<Line>) {
+fn segments(line: &str) -> Vec<Line> {
     let instructions: Vec<&str> = line.split(',').collect();
-    let mut hs: Vec<Line> = Vec::new();
-    let mut vs: Vec<Line> = Vec::new();
+    let mut result: Vec<Line> = Vec::new();
     let mut pos: Coord = (0, 0);
     for ins in instructions {
         let dir = ins.chars().next().unwrap();
@@ -61,36 +66,36 @@ fn segments(line: &str) -> (Vec<Line>, Vec<Line>) {
         pos = match dir {
             'U' => {
                 let nxt = (pos.0, pos.1 + nr);
-                vs.push((pos.0, pos.1, nxt.1));
+                result.push((LineType::Vertical, pos.0, pos.1, nxt.1));
                 nxt
             }
             'R' => {
                 let nxt = (pos.0 + nr, pos.1);
-                hs.push((pos.1, pos.0, nxt.0));
+                result.push((LineType::Horizontal, pos.1, pos.0, nxt.0));
                 nxt
             }
             'D' => {
                 let nxt = (pos.0, pos.1 - nr);
-                vs.push((pos.0, nxt.1, pos.1));
+                result.push((LineType::Vertical, pos.0, nxt.1, pos.1));
                 nxt
             }
             'L' => {
                 let nxt = (pos.0 - nr, pos.1);
-                hs.push((pos.1, nxt.0, pos.0));
+                result.push((LineType::Horizontal, pos.1, nxt.0, pos.0));
                 nxt
             }
             _ => panic!(),
         };
     }
 
-    (hs, vs)
+    result
 }
 
 fn intersection(horizontal: &Line, vertical: &Line) -> Option<Coord> {
-    if (horizontal.1..=horizontal.2).contains(&vertical.0)
-        && (vertical.1..=vertical.2).contains(&horizontal.0)
+    if (horizontal.2..=horizontal.3).contains(&vertical.1)
+        && (vertical.2..=vertical.3).contains(&horizontal.1)
     {
-        Some((vertical.0, horizontal.0))
+        Some((vertical.1, horizontal.1))
     } else {
         None
     }
@@ -102,11 +107,47 @@ mod day03_tests {
 
     #[test]
     fn test_intersection() {
-        assert_eq!(intersection(&(0, 0, 5), &(2, -2, 2)), Some((2, 0)));
-        assert_eq!(intersection(&(0, 0, 5), &(1, -1, 1)), Some((1, 0)));
-        assert_eq!(intersection(&(0, 0, 5), &(0, -1, 1)), Some((0, 0)));
-        assert_eq!(intersection(&(0, 0, 5), &(5, -1, 1)), Some((5, 0)));
-        assert_eq!(intersection(&(0, 0, 5), &(2, 6, 8)), None);
-        assert_eq!(intersection(&(0, 0, 5), &(-2, -2, 2)), None);
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, 2, -2, 2)
+            ),
+            Some((2, 0))
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, 1, -1, 1)
+            ),
+            Some((1, 0))
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, 0, -1, 1)
+            ),
+            Some((0, 0))
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, 5, -1, 1)
+            ),
+            Some((5, 0))
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, 2, 6, 8)
+            ),
+            None
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 0, 5),
+                &(LineType::Vertical, -2, -2, 2)
+            ),
+            None
+        );
     }
 }
