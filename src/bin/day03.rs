@@ -1,7 +1,9 @@
-// #![allow(dead_code)]
-// #![allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 use std::{
+    cmp::min,
+    collections::HashMap,
     fs::File,
     io::{prelude::*, BufReader},
     path::Path,
@@ -15,7 +17,7 @@ fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
         .collect()
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum LineType {
     Horizontal,
     Vertical,
@@ -34,10 +36,50 @@ fn main() {
     inters = all_intersections(inters, &segs2, &segs1);
 
     println!("{}", min_dist(&inters));
+
+    let d1 = dist_to_inter(&segs1, &inters);
+    let d2 = dist_to_inter(&segs2, &inters);
+
+    let mut result = 0;
+    for int in inters {
+        let dist = d1.get(&int).unwrap() + d2.get(&int).unwrap();
+        result = if result == 0 { dist } else { min(result, dist) };
+    }
+
+    println!("{}", result);
+}
+
+fn dist_to_inter(segs: &[Line], inters: &[Coord]) -> HashMap<Coord, i32> {
+    let mut result: HashMap<Coord, i32> = HashMap::new();
+    let mut dist = 0;
+    for seg in segs {
+        for inter in inters.iter().filter(|i| is_on_segment(i, seg)) {
+            let inter_x_y = if seg.0 == LineType::Horizontal {
+                inter.0
+            } else {
+                inter.1
+            };
+            let found_dist = dist + (inter_x_y - seg.2).abs();
+
+            result.insert(*inter, found_dist);
+        }
+        dist += (seg.3 - seg.2).abs();
+    }
+
+    result
+}
+
+fn is_on_segment((x, y): &Coord, (hor_ver, pos, start, end): &Line) -> bool {
+    hor_ver == &LineType::Horizontal && y == pos && min_max_contains(*start, *end, *x)
+        || hor_ver == &LineType::Vertical && x == pos && min_max_contains(*start, *end, *y)
 }
 
 fn min_dist(inters: &[Coord]) -> i32 {
-    inters.iter().map(manhattan_distance).filter(|i| *i > 0).min().unwrap()
+    inters.iter().map(manhattan_distance).min().unwrap()
+}
+
+fn manhattan_distance((x, y): &Coord) -> i32 {
+    x.abs() + y.abs()
 }
 
 fn all_intersections(mut inters: Vec<Coord>, segs1: &[Line], segs2: &[Line]) -> Vec<Coord> {
@@ -50,10 +92,6 @@ fn all_intersections(mut inters: Vec<Coord>, segs1: &[Line], segs2: &[Line]) -> 
     }
 
     inters
-}
-
-fn manhattan_distance((x, y): &Coord) -> i32 {
-    x.abs() + y.abs()
 }
 
 fn segments(line: &str) -> Vec<Line> {
@@ -76,12 +114,12 @@ fn segments(line: &str) -> Vec<Line> {
             }
             'D' => {
                 let nxt = (pos.0, pos.1 - nr);
-                result.push((LineType::Vertical, pos.0, nxt.1, pos.1));
+                result.push((LineType::Vertical, pos.0, pos.1, nxt.1));
                 nxt
             }
             'L' => {
                 let nxt = (pos.0 - nr, pos.1);
-                result.push((LineType::Horizontal, pos.1, nxt.0, pos.0));
+                result.push((LineType::Horizontal, pos.1, pos.0, nxt.0));
                 nxt
             }
             _ => panic!(),
@@ -92,13 +130,24 @@ fn segments(line: &str) -> Vec<Line> {
 }
 
 fn intersection(horizontal: &Line, vertical: &Line) -> Option<Coord> {
-    if (horizontal.2..=horizontal.3).contains(&vertical.1)
-        && (vertical.2..=vertical.3).contains(&horizontal.1)
+    if (horizontal.1 != 0 || vertical.1 != 0)
+        && min_max_contains(horizontal.2, horizontal.3, vertical.1)
+        && min_max_contains(vertical.2, vertical.3, horizontal.1)
     {
         Some((vertical.1, horizontal.1))
     } else {
         None
     }
+}
+
+fn min_max_contains(edge1: i32, edge2: i32, to_check: i32) -> bool {
+    let (left, right) = if edge1 < edge2 {
+        (edge1, edge2)
+    } else {
+        (edge2, edge1)
+    };
+
+    (left..=right).contains(&to_check)
 }
 
 #[cfg(test)]
@@ -123,10 +172,17 @@ mod day03_tests {
         );
         assert_eq!(
             intersection(
-                &(LineType::Horizontal, 0, 0, 5),
-                &(LineType::Vertical, 0, -1, 1)
+                &(LineType::Horizontal, 1, 0, 5),
+                &(LineType::Vertical, 0, -1, 2)
             ),
-            Some((0, 0))
+            Some((0, 1))
+        );
+        assert_eq!(
+            intersection(
+                &(LineType::Horizontal, 0, 5, 0),
+                &(LineType::Vertical, 5, -1, 1)
+            ),
+            Some((5, 0))
         );
         assert_eq!(
             intersection(
